@@ -55,7 +55,9 @@ export function MatchMap({
 }) {
   const [on, setOn] = useState<Record<Cat, boolean>>({ death: true, kill: true, ally: true, enemy: true, objective: true, structure: true, path: false })
   const last = Math.ceil(Math.max(1, ...events.map((e) => e.minute), ...path.map((p) => p.minute)))
-  const [upTo, setUpTo] = useState(last)
+  const [from, setFrom] = useState(0)
+  const [to, setTo] = useState(last)
+  const inRange = (m: number) => m >= from && m <= to
   const [hover, setHover] = useState<{ e: MapEvent; cat: Cat } | null>(null)
 
   const byId = new Map(players.map((p) => [p.participantId, p]))
@@ -142,8 +144,8 @@ export function MatchMap({
     )
   }
 
-  const shown = events.map((e) => ({ e, cat: classify(e) })).filter(({ e, cat }) => on[cat] && e.minute <= upTo)
-  const trail = path.filter((p) => p.minute <= upTo)
+  const shown = events.map((e) => ({ e, cat: classify(e) })).filter(({ e, cat }) => on[cat] && inRange(e.minute))
+  const trail = path.filter((p) => inRange(p.minute))
 
   return (
     <div className="space-y-3">
@@ -197,11 +199,22 @@ export function MatchMap({
       </svg>
       {hover && tooltip(hover)}
       </div>
-      <label className="flex items-center gap-3 text-sm">
-        <span className="text-muted-foreground">Até o minuto</span>
-        <input type="range" min={0} max={last} value={upTo} onChange={(e) => setUpTo(Number(e.target.value))} className="flex-1 accent-primary" />
-        <span className="w-10 text-right tabular-nums">{upTo}′</span>
-      </label>
+      <div className="flex items-center gap-3 text-sm">
+        <span className="text-muted-foreground">Minutos</span>
+        {/* dois ranges nativos no mesmo trilho; só os thumbs pegam o ponteiro (index.css .dual-range) */}
+        <div className="dual-range relative h-5 flex-1">
+          <div className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded bg-muted" />
+          <div
+            className="absolute top-1/2 h-1 -translate-y-1/2 rounded bg-primary"
+            style={{ left: `${(from / last) * 100}%`, right: `${100 - (to / last) * 100}%` }}
+          />
+          <input type="range" aria-label="Minuto inicial" min={0} max={last} value={from} onChange={(e) => setFrom(Math.min(Number(e.target.value), to))} />
+          <input type="range" aria-label="Minuto final" min={0} max={last} value={to} onChange={(e) => setTo(Math.max(Number(e.target.value), from))} />
+        </div>
+        <span className="w-16 text-right tabular-nums">
+          {from}′–{to}′
+        </span>
+      </div>
     </div>
   )
 }
