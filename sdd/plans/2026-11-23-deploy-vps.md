@@ -31,7 +31,11 @@ Volume `pgdata` e `./data` permanecem. `.env` está no `.gitignore` e não é so
 5. Segundo par de chaves, só para o Actions entrar na VPS:
    - pública em `~/.ssh/authorized_keys` do usuário de deploy
    - privada no secret `VPS_SSH_KEY` (PEM completo, com quebras de linha)
-6. `ssh-keyscan -H <host>` → secret `VPS_KNOWN_HOSTS`.
+6. O sshd da VPS só oferece `ssh-rsa`. O runner recusa esse tipo; o `ssh` do workflow habilita `HostKeyAlgorithms=+ssh-rsa` e `PubkeyAcceptedAlgorithms=+ssh-rsa`. O secret `VPS_KNOWN_HOSTS` tem de ser a chave RSA do host, não ed25519:
+
+```bash
+awk -v h="SEU_IP_OU_DOMINIO" '{print h, $1, $2}' /etc/ssh/ssh_host_rsa_key.pub
+```
 
 Secrets no environment `lol_statistics` (o job `deploy` declara `environment: lol_statistics`; secret de environment não chega no job sem isso):
 
@@ -40,7 +44,7 @@ Secrets no environment `lol_statistics` (o job `deploy` declara `environment: lo
 | `VPS_HOST` | IP ou domínio |
 | `VPS_USER` | usuário de deploy |
 | `VPS_SSH_KEY` | chave privada PEM |
-| `VPS_KNOWN_HOSTS` | saída de `ssh-keyscan -H` |
+| `VPS_KNOWN_HOSTS` | linha `IP ssh-rsa AAAA...` de `ssh_host_rsa_key.pub` |
 | `VPS_PORT` | opcional; vazio = 22 |
 
 Bootstrap na VPS, como o usuário de deploy:

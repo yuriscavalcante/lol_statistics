@@ -37,6 +37,8 @@ jobs:
           chmod 600 ~/.ssh/deploy ~/.ssh/known_hosts
           ssh -i ~/.ssh/deploy \
             -o IdentitiesOnly=yes \
+            -o HostKeyAlgorithms=+ssh-rsa \
+            -o PubkeyAcceptedAlgorithms=+ssh-rsa \
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
             -p "${PORT:-22}" \
             "$USER@$HOST" \
