@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { ChevronDown, Coins, LoaderCircle, Moon, Search, Skull, Sun, Swords, Trophy, Wheat } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -66,7 +66,24 @@ export default function App() {
   const [loading, setLoading] = useState(false)
   const [dark, setDark] = useState(() => document.documentElement.classList.contains('dark'))
   const [ddVersion, setDdVersion] = useState('')
-  const [selected, setSelected] = useState<Metrics | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const loaded = useRef('') // `player|queue` já buscado, para o popstate não refazer o fetch
+
+  useEffect(() => {
+    function fromUrl() {
+      const p = new URLSearchParams(location.search)
+      const player = p.get('player')
+      if (!player) return
+      const q = Number(p.get('queue')) || QUEUES[0].id
+      setRiotId(player)
+      setQueue(q)
+      setSelectedId(p.get('match'))
+      if (loaded.current !== `${player}|${q}`) load(player, q)
+    }
+    fromUrl()
+    addEventListener('popstate', fromUrl)
+    return () => removeEventListener('popstate', fromUrl)
+  }, [])
 
   useEffect(() => {
     fetch(`${DDRAGON}/api/versions.json`)
@@ -85,13 +102,28 @@ export default function App() {
     setDark(!dark)
   }
 
-  async function search(e: FormEvent) {
+  function select(id: string | null) {
+    const p = new URLSearchParams(location.search)
+    if (id) p.set('match', id)
+    else p.delete('match')
+    history.pushState(null, '', `?${p}`)
+    setSelectedId(id)
+  }
+
+  function search(e: FormEvent) {
     e.preventDefault()
-    const [name, tag] = riotId.split('#')
+    history.pushState(null, '', `?${new URLSearchParams({ player: riotId, queue: String(queue) })}`)
+    setSelectedId(null)
+    load(riotId, queue)
+  }
+
+  async function load(player: string, queue: number) {
+    const [name, tag] = player.split('#')
     if (!name || !tag) return setError('Use o formato Nome#TAG')
+    loaded.current = `${player}|${queue}`
     setLoading(true)
     setError('')
-    setSelected(null)
+    setRows([])
     try {
       const r = await fetch(
         `${API}/players/${encodeURIComponent(name)}/${encodeURIComponent(tag)}/matches?queue=${queue}`,
@@ -196,12 +228,13 @@ export default function App() {
         </div>
       )}
 
-      {selected ? (
+      {selectedId && rows.length > 0 ? (
         <MatchDetail
-          matchId={selected.matchId}
-          puuid={selected.puuid}
+          key={selectedId}
+          matchId={selectedId}
+          puuid={rows[0].puuid}
           ddVersion={ddVersion}
-          onBack={() => setSelected(null)}
+          onBack={() => select(null)}
         />
       ) : rows.length > 0 ? (
         <Card className="overflow-hidden py-0">
@@ -224,8 +257,8 @@ export default function App() {
                 <TableRow
                   key={r.matchId}
                   tabIndex={0}
-                  onClick={() => setSelected(r)}
-                  onKeyDown={(e) => e.key === 'Enter' && setSelected(r)}
+                  onClick={() => select(r.matchId)}
+                  onKeyDown={(e) => e.key === 'Enter' && select(r.matchId)}
                   className={`cursor-pointer border-l-4 ${r.remake ? 'border-l-transparent opacity-40' : r.win ? 'border-l-emerald-500' : 'border-l-red-500'}`}
                 >
                   <TableCell className="pl-4">
