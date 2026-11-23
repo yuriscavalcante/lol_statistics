@@ -1,0 +1,19 @@
+services:
+  api:
+    build: { context: ., dockerfile: apps/api/Dockerfile }
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+    volumes:
+      - ./data:/srv/data
+
+  web:
+    build: { context: ., dockerfile: apps/web/Dockerfile }
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on: [api]
+
+volumes:
+  pgdata:
