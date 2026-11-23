@@ -12,7 +12,7 @@ Workflow que testa e publica `main` na VPS por SSH, reusando `docker-compose.pro
 ```
 push main (ou workflow_dispatch)
   → job test: uv run --frozen pytest em apps/api
-  → job deploy (SSH), só se o teste passou:
+  → job deploy (environment lol_statistics, SSH), só se o teste passou:
        cd /opt/riot-statistics
        git pull --ff-only
        docker compose -f docker-compose.prod.yml up -d --build
@@ -33,7 +33,7 @@ Volume `pgdata` e `./data` permanecem. `.env` está no `.gitignore` e não é so
    - privada no secret `VPS_SSH_KEY` (PEM completo, com quebras de linha)
 6. `ssh-keyscan -H <host>` → secret `VPS_KNOWN_HOSTS`.
 
-Secrets do repositório:
+Secrets no environment `lol_statistics` (o job `deploy` declara `environment: lol_statistics`; secret de environment não chega no job sem isso):
 
 | Secret | Conteúdo |
 | --- | --- |
@@ -54,7 +54,7 @@ cd /opt/riot-statistics && docker compose -f docker-compose.prod.yml up -d --bui
 
 ## Passos
 
-1. Criar `.github/workflows/deploy.yml` com os dois jobs e os secrets acima.
+1. Criar `.github/workflows/deploy.yml` com os dois jobs, `environment: lol_statistics` no deploy, e os secrets acima.
 
 ## Arquivos
 

@@ -11,7 +11,7 @@ Workflow do GitHub Actions que, em push na `main`:
 1. Roda os testes da API.
 2. Entra na VPS por SSH, faz `git pull --ff-only` e recria os containers com o compose de produção.
 
-Chave SSH e host ficam nos Secrets do repositório. O `.env` continua só na VPS.
+Chave SSH e host ficam nos secrets do environment `lol_statistics`. O `.env` continua só na VPS.
 
 ## Fora de escopo
 
