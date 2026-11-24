@@ -91,18 +91,46 @@ def _team_payload(td: dict) -> dict:
     }
 
 
-def analyze(detail: dict, team: bool = False) -> dict:
+VIDEOS_HINT = """
+Se vier `trechosDeVideos` (falas transcritas de vídeos de coaching, sem pontuação nem palavras vazias), use como referência de boas práticas
+quando forem relevantes para esta partida; ignore os que não forem."""
+
+
+SYSTEM_ASK = """Você responde dúvidas de League of Legends usando SÓ os trechos numerados recebidos: falas transcritas
+de vídeos de coaching, sem pontuação nem palavras vazias. Responda em português do Brasil, direto e prático,
+citando os trechos usados como [n]. Reescreva com suas palavras, nunca copie o texto dos trechos. Se os trechos não respondem a pergunta, diga isso em uma frase."""
+
+
+def _client() -> genai.Client:
     key = os.getenv("GEMINI_API_KEY")
     if not key:
         raise RuntimeError("GEMINI_API_KEY não definida no .env")
+    return genai.Client(api_key=key, http_options=types.HttpOptions(api_version="v1beta"))
+
+
+def ask(pergunta: str, textos: list[str]) -> str:
+    contents = "\n".join([f"[{i}] {t}" for i, t in enumerate(textos, 1)] + [f"Pergunta: {pergunta}"])
+    with _client() as client:
+        r = client.models.generate_content(
+            model=model(), contents=contents, config=types.GenerateContentConfig(system_instruction=SYSTEM_ASK)
+        )
+    return r.text or ""
+
+
+def analyze(detail: dict, team: bool = False, trechos: list[str] | None = None) -> dict:
     # Client precisa de referência viva: como temporário, o __del__ fecha o HTTP antes da requisição
     # v1beta: no google-genai 3.6 o padrão virou v1, que recusa system_instruction
-    with genai.Client(api_key=key, http_options=types.HttpOptions(api_version="v1beta")) as client:
+    payload = _team_payload(detail) if team else _payload(detail)
+    if trechos:
+        payload["trechosDeVideos"] = trechos
+    with _client() as client:
         r = client.models.generate_content(
             model=model(),
-            contents=json.dumps(_team_payload(detail) if team else _payload(detail), ensure_ascii=False),
+            contents=json.dumps(payload, ensure_ascii=False),
             config=types.GenerateContentConfig(
-                system_instruction=SYSTEM_TEAM if team else SYSTEM, response_mime_type="application/json", response_schema=Analise
+                system_instruction=(SYSTEM_TEAM if team else SYSTEM) + VIDEOS_HINT,
+                response_mime_type="application/json",
+                response_schema=Analise,
             ),
         )
     if r.parsed is None:

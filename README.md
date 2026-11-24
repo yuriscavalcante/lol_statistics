@@ -38,3 +38,16 @@ rows = [compute_metrics(json.loads(m.read_text()), json.loads((m.parent.parent /
         for m in pathlib.Path("../../data/raw/match").glob("*.json")]
 pd.DataFrame(rows).describe()
 ```
+
+## Vídeos de referência para a IA
+
+`pnpm video <link> [outro link...]` no terminal (mostra a % de redução) ou `POST /videos?url=<link>` no Swagger baixa a legenda sem IA, salva a transcrição inteira
+(`videos`) e um resumo por regras (`video_trechos`: blocos de 60 s limpos, só os com termos de jogo). Na análise, os
+5 blocos mais relevantes para os campeões/rotas da partida vão junto para o Gemini. O YouTube pode bloquear o download
+da legenda a partir do IP da VPS; nesse caso, cadastre os vídeos rodando a API local apontando para o banco de prod.
+
+```bash
+pnpm video "<link>"           # aspas: o zsh quebra links com ? e &
+pnpm video --reprocessar      # refaz os resumos de todos os vídeos a partir da transcrição salva (sem YouTube)
+curl -X POST -G localhost:8000/perguntar --data-urlencode "pergunta=como controlar a wave de assassino?"
+```

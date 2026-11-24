@@ -4,7 +4,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from google.genai import errors as genai_errors
 from psycopg import OperationalError
 
-from app import ai, db, riot
+from youtube_transcript_api import YouTubeTranscriptApiException
+
+from app import ai, db, riot, videos
 from app.metrics import compute_metrics, match_detail, team_detail
 
 app = FastAPI(title="riot-statistics")
@@ -72,8 +74,17 @@ def create_analysis(match_id: str, puuid: str | None = None, team: int | None = 
         detail = _detail(match_id, puuid)
     else:
         detail = team_detail(_riot(riot.match, match_id), _riot(riot.timeline, match_id), team)
+    if team is None:
+        ps = [p for p in detail["participants"] if p["isMe"] or p["isOpponent"]]
+    else:
+        ps = detail["players"]
+    termos = videos.search_terms([p["championName"] for p in ps], [p["teamPosition"] for p in ps])
     try:
-        content = ai.analyze(detail, team=team is not None)
+        refs = db.trechos(termos)
+    except (OperationalError, RuntimeError) as e:
+        raise HTTPException(503, f"Banco indisponível: {e}")
+    try:
+        content = ai.analyze(detail, team=team is not None, trechos=[t["texto"] for t in refs])
     except RuntimeError as e:
         raise HTTPException(503, str(e))
     except (genai_errors.APIError, ValueError) as e:
@@ -82,3 +93,34 @@ def create_analysis(match_id: str, puuid: str | None = None, team: int | None = 
         return db.save(match_id, subject, ai.model(), content)
     except (OperationalError, RuntimeError) as e:
         raise HTTPException(503, f"Banco indisponível: {e}")
+
+
+@app.post("/videos")
+def create_video(url: str):
+    try:
+        return videos.ingest(url)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except YouTubeTranscriptApiException as e:
+        raise HTTPException(502, f"Não foi possível baixar a legenda: {type(e).__name__}")
+    except (OperationalError, RuntimeError) as e:
+        raise HTTPException(503, f"Banco indisponível: {e}")
+
+
+@app.post("/perguntar")
+def perguntar(pergunta: str):
+    """Responde com base só nos vídeos salvos. Uso: curl -X POST -G :8000/perguntar --data-urlencode "pergunta=..." """
+    try:
+        refs = db.trechos(videos.clean(pergunta).split(), 8)
+    except (OperationalError, RuntimeError) as e:
+        raise HTTPException(503, f"Banco indisponível: {e}")
+    if not refs:
+        return {"resposta": "Nenhum vídeo salvo fala sobre isso.", "fontes": []}
+    try:
+        resposta = ai.ask(pergunta, [t["texto"] for t in refs])
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+    except genai_errors.APIError as e:
+        raise HTTPException(502, f"Falha no Gemini: {e}")
+    fontes = [f"[{i}] https://youtu.be/{t['videoId']}?t={t['minuto'] * 60}" for i, t in enumerate(refs, 1)]
+    return {"resposta": resposta, "fontes": fontes}

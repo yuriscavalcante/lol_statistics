@@ -4,7 +4,8 @@
   "scripts": {
     "dev": "concurrently -n api,web \"pnpm dev:api\" \"pnpm --filter web dev\"",
     "dev:api": "cd apps/api && uv run fastapi dev app/main.py --port 8000",
-    "test": "cd apps/api && uv run pytest"
+    "test": "cd apps/api && uv run pytest",
+    "video": "cd apps/api && uv run python -m app.videos"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"
