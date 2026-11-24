@@ -48,6 +48,7 @@ type Detail = {
   events: GameEvent[]
   mapEvents: MapEvent[]
   path: { minute: number; x: number; y: number }[]
+  paths: Record<number, { minute: number; x: number; y: number }[]>
 }
 type Analysis = {
   model: string
@@ -437,7 +438,7 @@ export function MatchDetail({
           <CardTitle>Mapa</CardTitle>
         </CardHeader>
         <CardContent>
-          <MatchMap events={detail.mapEvents ?? []} path={detail.path ?? []} players={detail.participants} me={me} ddVersion={ddVersion} />
+          <MatchMap events={detail.mapEvents ?? []} path={detail.path ?? []} paths={detail.paths ?? {}} players={detail.participants} me={me} ddVersion={ddVersion} />
         </CardContent>
       </Card>
 
