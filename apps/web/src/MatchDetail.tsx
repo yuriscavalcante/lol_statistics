@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { MatchMap, type MapEvent } from './MatchMap'
+import { MatchMap, type Death, type MapEvent } from './MatchMap'
 
 const API = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
 const DDRAGON = 'https://ddragon.leagueoflegends.com'
@@ -49,6 +49,7 @@ type Detail = {
   mapEvents: MapEvent[]
   path: { minute: number; x: number; y: number }[]
   paths: Record<number, { minute: number; x: number; y: number }[]>
+  deaths?: Record<number, Death[]>
 }
 type Analysis = {
   model: string
@@ -438,7 +439,7 @@ export function MatchDetail({
           <CardTitle>Mapa</CardTitle>
         </CardHeader>
         <CardContent>
-          <MatchMap events={detail.mapEvents ?? []} path={detail.path ?? []} paths={detail.paths ?? {}} players={detail.participants} me={me} ddVersion={ddVersion} />
+          <MatchMap events={detail.mapEvents ?? []} path={detail.path ?? []} paths={detail.paths ?? {}} deaths={detail.deaths ?? {}} players={detail.participants} me={me} ddVersion={ddVersion} />
         </CardContent>
       </Card>
 

@@ -167,3 +167,16 @@ def test_grades():
     ps[3] |= {"totalMinionsKilled": 0}
     g = grades(ps)
     assert g[5] > g[4]  # suporte sem CS não é punido
+
+
+def test_death_windows():
+    from app.metrics import death_timer, death_windows, match_detail
+
+    assert death_timer(1, 5) == 6 and death_timer(18, 10) == 52.5
+    assert death_timer(10, 20) == 32.5 * (1 + 0.00425 * 10)
+    assert death_timer(18, 60) == 52.5 * 1.5  # fator limitado a 50%
+
+    match, tl = build_pos()
+    tl["info"]["frames"][8]["participantFrames"]["1"]["level"] = 5
+    assert death_windows(tl) == {1: [{"start": 8.5, "end": round(8.5 + 10 / 60, 4), "x": 7000, "y": 7000}]}
+    assert match_detail(match, tl, "me")["deaths"][1][0]["start"] == 8.5

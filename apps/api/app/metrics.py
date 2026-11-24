@@ -94,6 +94,41 @@ def _snapshots(timeline: dict) -> list[dict[int, tuple[float, float]]]:
     ]
 
 
+BRW = (6, 6, 8, 8, 10, 12, 16, 21, 26, 32.5, 35, 37.5, 40, 42.5, 45, 47.5, 50, 52.5)
+
+
+def death_timer(level: int, minute: float) -> float:
+    """Segundos morto (wiki do LoL): BRW do nível x fator de tempo de jogo.
+
+    ponytail: estimativa; a timeline não traz respawn e ignora runas/feitiços que encurtam.
+    """
+    half = lambda m: math.ceil(2 * max(0.0, m))  # o fator sobe a cada meio minuto
+    tif = 0.0
+    if minute > 15:
+        tif = 0.00425 * half(min(minute, 30) - 15)
+    if minute > 30:
+        tif += 0.003 * half(min(minute, 45) - 30)
+    if minute > 45:
+        tif += 0.0145 * half(minute - 45)
+    return BRW[min(max(level, 1), 18) - 1] * (1 + min(tif, 0.5))
+
+
+def death_windows(timeline: dict) -> dict[int, list[dict]]:
+    """Por pid, cada morte em minutos: de `start` (abate) até `end` (respawn estimado), no local (x, y)."""
+    frames = timeline["info"]["frames"]
+    out: dict[int, list[dict]] = {}
+    for fr in frames:
+        for e in fr["events"]:
+            if e["type"] != "CHAMPION_KILL" or "position" not in e:
+                continue
+            start = e["timestamp"] / 60_000
+            pid = e["victimId"]
+            pf = frames[min(int(start), len(frames) - 1)]["participantFrames"].get(str(pid), {})
+            end = start + death_timer(pf.get("level", 1), start) / 60
+            out.setdefault(pid, []).append({"start": round(start, 4), "end": round(end, 4), **e["position"]})
+    return out
+
+
 def _near(snap: dict, center: tuple, ids, radius: float) -> int:
     return sum(1 for pid in ids if pid in snap and math.dist(snap[pid], center) <= radius)
 
@@ -239,6 +274,7 @@ def match_detail(match: dict, timeline: dict, puuid: str) -> dict:
                                  for m, s in enumerate(_snapshots(timeline)) if p["participantId"] in s]
             for p in players
         },
+        "deaths": death_windows(timeline),
         "positioning": positioning(match, timeline, [mid]),
     }
 

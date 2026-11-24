@@ -92,6 +92,18 @@ const at = (pts: Pt[], m: number) => {
   const k = (m - a.minute) / (b.minute - a.minute)
   return { x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k }
 }
+export type Death = { start: number; end: number; x: number; y: number }
+const FOUNTAIN: Record<number, { x: number; y: number }> = { 100: { x: 554, y: 581 }, 200: { x: 14302, y: 14388 } }
+// trajeto com as mortes: vai até o local, fica parado até o respawn e reaparece na fonte
+const withDeaths = (pts: Pt[], deaths: Death[], teamId: number) => {
+  const dead = (m: number) => deaths.some((d) => m > d.start && m <= d.end)
+  const extra = deaths.flatMap((d) => [
+    { minute: d.start, x: d.x, y: d.y },
+    { minute: d.end, x: d.x, y: d.y },
+    { minute: d.end + 1e-6, ...FOUNTAIN[teamId] },
+  ])
+  return [...pts.filter((p) => !dead(p.minute)), ...extra].sort((a, b) => a.minute - b.minute)
+}
 const clock = (m: number) => {
   const s = Math.floor(m * 60)
   return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
@@ -101,6 +113,7 @@ export function MatchMap({
   events,
   path,
   paths,
+  deaths,
   players,
   me,
   ddVersion,
@@ -108,6 +121,7 @@ export function MatchMap({
   events: MapEvent[]
   path: Pt[]
   paths: Record<number, Pt[]>
+  deaths: Record<number, Death[]>
   players: Player[]
   me: Player
   ddVersion: string
@@ -318,13 +332,16 @@ export function MatchMap({
             {players.map((p) => {
               const pts = paths[p.participantId]
               if (!pts?.length || !ddVersion) return null
-              const pos = at(pts, t)
+              const ds = deaths[p.participantId] ?? []
+              const pos = at(withDeaths(pts, ds, p.teamId), t)
+              const dead = ds.some((d) => t >= d.start && t <= d.end)
               const x = px(pos.x)
               const y = py(pos.y)
               const ring = p.participantId === me.participantId ? 'stroke-yellow-300' : p.teamId === me.teamId ? 'stroke-sky-400' : 'stroke-red-500'
               return (
-                <g key={p.participantId}>
+                <g key={p.participantId} opacity={dead ? 0.85 : 1}>
                   <image
+                    style={dead ? { filter: 'grayscale(1)' } : undefined}
                     href={`https://ddragon.leagueoflegends.com/cdn/${ddVersion}/img/champion/${p.championName}.png`}
                     x={x - 11}
                     y={y - 11}
@@ -333,6 +350,7 @@ export function MatchMap({
                     clipPath="url(#champ-clip)"
                   />
                   <circle cx={x} cy={y} r={11} fill="none" strokeWidth={2} className={ring} />
+                  {dead && <path d={`M${x - 7} ${y - 7}L${x + 7} ${y + 7}M${x + 7} ${y - 7}L${x - 7} ${y + 7}`} strokeWidth={3} strokeLinecap="round" className="stroke-red-600" />}
                 </g>
               )
             })}
@@ -345,7 +363,7 @@ export function MatchMap({
         <Button size="sm" onClick={play}>
           {playing ? '❚❚ Pausar' : '▶ Replay'}
         </Button>
-        {[1, 2, 4].map((v) => (
+        {[0.25, 0.5, 1, 2, 4].map((v) => (
           <Button key={v} size="sm" variant={speed === v ? 'default' : 'outline'} onClick={() => setSpeed(v)} aria-label={`Velocidade ${v}×`}>
             {v}×
           </Button>
